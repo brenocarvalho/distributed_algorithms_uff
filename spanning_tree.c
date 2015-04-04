@@ -7,8 +7,9 @@
 */
 #include <mpi.h>
 #include <stdio.h>
+#define MSG_SIZE 2
 
-typedef int msg_type;
+typedef int msg_type[MSG_SIZE];
 
 int isRoot(int rank){
 	return !(rank % 3);
@@ -22,22 +23,23 @@ int main (int argc, char* argv[])
 
   int world_rank, world_size;
 	int neighbours = 0, received = 0;
-	msg_type parent = -1, my_root = -1;
+	int parent = -1, my_root = -1;
 
-  MPI_Init (&argc, &argv);      /* starts MPI */
+  MPI_Init (&argc, &argv);     											  /* starts MPI */
   MPI_Comm_rank (MPI_COMM_WORLD, &world_rank);        /* get current process id */
   MPI_Comm_size (MPI_COMM_WORLD, &world_size);        /* get number of processes */
 
   //printf( "Spanning Tree Algorithm: Process %d of %d\n", world_rank, world_size );
-
+msg_type msg;
 	if (isRoot(world_rank)) {
 		my_root = world_rank;
 	  //Send query to every neighbour
+		msg[0] = my_root; msg[1] = QUERY;
 	  for(int i = 0; i < world_size; i++){
 		  if(i != world_rank){
-		    MPI_Send(&my_root, 1, MPI_INT, i, QUERY, MPI_COMM_WORLD);
+		    MPI_Send(msg, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
 				neighbours+=1;
-				printf("Process %2d send QUERY(root=%2d) to %2d\n", world_rank, my_root, i);
+				printf("Process %2d send  QUERY(root=%2d) to %2d\n", world_rank, my_root, i);
       }
 		}
 		if(neighbours == 0){
@@ -47,51 +49,55 @@ int main (int argc, char* argv[])
 		}
 	}
 
-	msg_type msg;
 	MPI_Status status;
 	while(1){
-		MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-		//printf("\n**Process %d received %d from %d\n\n", world_rank, status.MPI_TAG, status.MPI_SOURCE);
-		if(status.MPI_TAG == QUERY){
-		  if (msg < my_root || my_root < 0){
-				my_root = msg;
+		MPI_Recv(&msg, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+		//printf("** msg=%d Process %d received %d, but sent %d\n", msg[0], world_rank, received, neighbours);
+		if(msg[1] == QUERY){
+		  if (msg[0] < my_root || my_root < 0){
+				my_root = msg[0];
 				parent = status.MPI_SOURCE;
 				neighbours = received = 0;
+				msg[0] = my_root; msg[1] = QUERY;
 				for(int i = 0; i < world_size; i++){
 					if((i != world_rank) && (i != parent)){
-						MPI_Send(&my_root, 1, MPI_INT, i, QUERY, MPI_COMM_WORLD);
+						MPI_Send(msg, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
 						neighbours+=1;
 						printf("Process %2d send  QUERY(root=%2d) to %2d\n", world_rank, my_root, i);
 				  }
 				}
 				if(!neighbours){
-					MPI_Send(&my_root, 1, MPI_INT, status.MPI_SOURCE, ACCEPT, MPI_COMM_WORLD);
+					msg[1] = ACCEPT;
+					MPI_Send(msg, 2, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 					printf("Process %2d send ACCEPT(root=%2d) to %2d\n", world_rank, my_root, status.MPI_SOURCE);
 					break;
 				}
 		  }else{
-				MPI_Send(&my_root, 1, MPI_INT, status.MPI_SOURCE, REJECT, MPI_COMM_WORLD);
+				msg[0] = my_root; msg[1] = REJECT;
+				MPI_Send(msg, 2, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 				printf("Process %2d send REJECT(root=%2d) to %2d\n", world_rank, my_root, status.MPI_SOURCE);
 			}
-		}else if(status.MPI_TAG == ACCEPT){
-			if(msg == my_root){
+		}else if(msg[1] == ACCEPT){
+			if(msg[0] == my_root){
 				received+=1;
 				//printf("Process %d has received: %d and sent %d\n", world_rank, received, neighbours);
 		    if(received == neighbours){
 					if(parent >= 0){
-						MPI_Send(&my_root, 1, MPI_INT, parent, ACCEPT, MPI_COMM_WORLD);
+						msg[0] = my_root; msg[1] = ACCEPT;
+						MPI_Send(msg, 2, MPI_INT, parent, 0, MPI_COMM_WORLD);
 						printf("Process %2d send ACCEPT(root=%2d) to %2d\n", world_rank, my_root, parent);
 					}
 					break;
 				}
 			}
-		}else if(status.MPI_TAG == REJECT){
-			if(msg == my_root){
+		}else if(msg[1] == REJECT){
+			if(msg[0] == my_root){
 				received+=1;
 				//printf("Process %d has received: %d and sent %d\n", world_rank, received, neighbours);
 				if(received == neighbours){
 					if(parent >= 0){
-						MPI_Send(&my_root, 1, MPI_INT, parent, ACCEPT, MPI_COMM_WORLD);
+						msg[0] = my_root; msg[1] = ACCEPT;
+						MPI_Send(msg, 2, MPI_INT, parent, 0, MPI_COMM_WORLD);
 						printf("Process %2d send ACCEPT(root=%2d) to %2d\n", world_rank, my_root, parent);
 					}
 					break;
@@ -100,4 +106,5 @@ int main (int argc, char* argv[])
 		}
 	}
 	MPI_Finalize();
+  return 0;
 }
