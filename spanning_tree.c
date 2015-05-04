@@ -15,23 +15,22 @@ int isRoot(int rank){
 	return !(rank % 3);
 }
 
-int main (int argc, char* argv[])
-{
+int main (int argc, char* argv[]){
 	const int QUERY  = 0;
 	const int ACCEPT = 1;
 	const int REJECT = 2;
-  const int ACK    = 3;
+    const int ACK    = 3;
 
-  int world_rank, world_size;
+    int world_rank, world_size;
 	int neighbours = 0, received = 0;
 	int parent = -1, my_root = -1;
 
-  MPI_Init (&argc, &argv);     											  /* starts MPI */
-  MPI_Comm_rank (MPI_COMM_WORLD, &world_rank);        /* get current process id */
-  MPI_Comm_size (MPI_COMM_WORLD, &world_size);        /* get number of processes */
+    MPI_Init (&argc, &argv);     											  /* starts MPI */
+    MPI_Comm_rank (MPI_COMM_WORLD, &world_rank);        /* get current process id */
+    MPI_Comm_size (MPI_COMM_WORLD, &world_size);        /* get number of processes */
 
-  //printf( "Spanning Tree Algorithm: Process %d of %d\n", world_rank, world_size );
-msg_type msg;
+    //printf( "Spanning Tree Algorithm: Process %d of %d\n", world_rank, world_size );
+    msg_type msg;
 	if (isRoot(world_rank)) {
 		my_root = world_rank;
 	  //Send query to every neighbour
@@ -65,7 +64,7 @@ msg_type msg;
 						//printf("%2d ---QUERY(%d)---> %2d\n", world_rank, my_root, i);
 						MPI_Send(msg, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
 						neighbours+=1;
-				  }
+				    }
 				}
 				if(!neighbours){
 					msg[1] = ACCEPT;
@@ -73,7 +72,7 @@ msg_type msg;
 					MPI_Send(msg, 2, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
 					break;
 				}
-		  }else{
+		    }else{
 				msg[0] = my_root; msg[1] = REJECT;
 				//printf("%2d ---REJECT(%d)---> %2d\n", world_rank, my_root, status.MPI_SOURCE);
 				MPI_Send(msg, 2, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
@@ -136,5 +135,5 @@ msg_type msg;
 		}
 	}
 	MPI_Finalize();
-  return 0;
+    return 0;
 }
